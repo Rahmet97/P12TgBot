@@ -1,5 +1,8 @@
+import os
+
 import requests
 import logging
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, executor
 from aiogram.types import (
     Message,
@@ -11,8 +14,10 @@ from aiogram.types import (
 )
 
 logging.basicConfig(level=logging.INFO)
+load_dotenv()
 
-bot = Bot('5779177135:AAFNCKQq-Q2uzkgcW8w7Z1t1gke8UA7_JR0')
+bot_token = os.getenv('BOT_TOKEN')
+bot = Bot(bot_token)
 dp = Dispatcher(bot)
 
 @dp.message_handler(commands=['start'])
@@ -36,7 +41,8 @@ async def get_weather(msg: Message):
     print(city)
     url = "https://api.openweathermap.org/data/2.5/weather"
     global rsp
-    rsp = requests.post(url, params={'q': city, 'appid': '11383a422946d6690d8e97982829c739', 'units': 'metric', 'lang': 'UZ'})
+    app_id = os.getenv('APPID')
+    rsp = requests.post(url, params={'q': city, 'appid': app_id, 'units': 'metric', 'lang': 'UZ'})
     if rsp.status_code == 200:
         rsp = rsp.json()
         humidity_btn = KeyboardButton('Humidity')
