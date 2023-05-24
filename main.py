@@ -1,5 +1,6 @@
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
+from database.handler import get_user
 from states.states import UserState
 from dispetcher import dp
 
@@ -41,11 +42,14 @@ async def set_phone(msg: Message, state: FSMContext):
         phone = msg.contact.phone_number
     else:
         phone = msg.text
-    await state.update_data({
-        'phone': phone
-    })
-    await msg.answer("Ism familiyangizni to'liq kiriting.", reply_markup=ReplyKeyboardRemove())
-    await UserState.full_name.set()
+    if await get_user(phone):
+        await msg.answer("Bunday telefon raqam oldin ro'yhatdan o'tgan. Iltimos boshqa raqam kiriting.")
+    else:
+        await state.update_data({
+            'phone': phone
+        })
+        await msg.answer("Ism familiyangizni to'liq kiriting.", reply_markup=ReplyKeyboardRemove())
+        await UserState.full_name.set()
 
 
 @dp.message_handler(state=UserState.full_name)
