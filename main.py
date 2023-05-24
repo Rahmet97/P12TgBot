@@ -1,9 +1,15 @@
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+
+from states.states import UserState
+from dispetcher import dp
+
 import os
 
 import requests
 import logging
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, executor
+from aiogram.dispatcher import FSMContext
 from aiogram.types import (
     Message,
     KeyboardButton,
@@ -14,66 +20,69 @@ from aiogram.types import (
 )
 
 logging.basicConfig(level=logging.INFO)
-load_dotenv()
 
-bot_token = os.getenv('BOT_TOKEN')
-bot = Bot(bot_token)
-dp = Dispatcher(bot)
+from callbacks.callback_handler import confirm, cancel
 
 @dp.message_handler(commands=['start'])
 async def start(msg: Message):
-    btn1 = KeyboardButton('Tashkent')
-    btn2 = KeyboardButton('Samarkand')
-    btn3 = KeyboardButton('Jizzakh')
-    btn4 = KeyboardButton('Sirdaryo')
-    kyb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    kyb.add(btn1, btn2)
-    kyb.add(btn3, btn4)
-    await msg.answer('Botimizga xush kelibsiz! Ob-xavo ni ko\'rish uchun shahar nomini kiriting!', reply_markup=kyb)
+    btn_contact = KeyboardButton("📞 Telefon raqamni qoldirish", request_contact=True)
+    btn = ReplyKeyboardMarkup(resize_keyboard=True)
+    btn.add(btn_contact)
+    await msg.answer(
+        'Botimizga xush kelibsiz! Botdan foydalanish uchun telefon raqamingizni qoldiring!',
+        reply_markup=btn
+    )
+    await UserState.phone.set()
+
+
+@dp.message_handler(state=UserState.phone, content_types=['text', 'contact'])
+async def set_phone(msg: Message, state: FSMContext):
+    if msg.contact:
+        phone = msg.contact.phone_number
+    else:
+        phone = msg.text
+    await state.update_data({
+        'phone': phone
+    })
+    await msg.answer("Ism familiyangizni to'liq kiriting.", reply_markup=ReplyKeyboardRemove())
+    await UserState.full_name.set()
+
+
+@dp.message_handler(state=UserState.full_name)
+async def set_fullname(msg: Message, state: FSMContext):
+    full_name = msg.text
+    await state.update_data({
+        'full_name': full_name
+    })
+    await msg.answer("Necha yoshdasiz?")
+    await UserState.age.set()
+
+
+@dp.message_handler(state=UserState.age)
+async def set_age(msg: Message, state: FSMContext):
+    age = msg.text
+    await state.update_data({
+        'age': age
+    })
+    data = await state.get_data()
+    fullname = data['full_name']
+    phone = data['phone']
+    age = data['age']
+    data_msg = f'''
+        Fullname: {fullname}
+        phone: {phone}
+        age: {age}
+    '''
+    confirm_btn = InlineKeyboardButton("✅ Tasdiqlash", callback_data="confirm")
+    cancel_btn = InlineKeyboardButton("❌ Bekor qilish", callback_data="cancel")
+    inline = InlineKeyboardMarkup()
+    inline.add(confirm_btn, cancel_btn)
+    await msg.answer(f"Siz muvaffaqiyatli ro'yhatdan o'tdingiz.\n{data_msg}", reply_markup=inline)
+
 
 @dp.message_handler(commands=['help'])
 async def help(msg: Message):
     await msg.reply('Bu bot shunchaki test uchun.')
-rsp = None
-@dp.message_handler(lambda message: message.text in ['Tashkent', 'Samarkand', 'Jizzakh', 'Sirdaryo'])
-async def get_weather(msg: Message):
-    city = msg.text
-    print(city)
-    url = "https://api.openweathermap.org/data/2.5/weather"
-    global rsp
-    app_id = os.getenv('APPID')
-    rsp = requests.post(url, params={'q': city, 'appid': app_id, 'units': 'metric', 'lang': 'UZ'})
-    if rsp.status_code == 200:
-        rsp = rsp.json()
-        humidity_btn = KeyboardButton('Humidity')
-        pressure_btn = KeyboardButton('Pressure')
-        max_temp_btn = KeyboardButton('Max temp')
-        min_temp_btn = KeyboardButton('Min temp')
-        status_btn = KeyboardButton('Status')
-        keyboard_button = ReplyKeyboardMarkup(resize_keyboard=True)
-        keyboard_button.add(humidity_btn, pressure_btn)
-        keyboard_button.add(max_temp_btn, min_temp_btn, status_btn)
-        await msg.answer(str(round(rsp['main']['temp'])) + '°C', reply_markup=keyboard_button)
-    else:
-        await msg.answer('Qandaydir xatolik!')
-
-@dp.message_handler(lambda message: message.text in ['Humidity', 'Pressure', 'Max temp', 'Min temp', 'Status'])
-async def get_other_datas(msg: Message):
-    data = None
-    print(rsp)
-    if msg.text == 'Humidity':
-        data = rsp['main']['humidity']
-    elif msg.text == 'Pressure':
-        data = rsp['main']['pressure']
-    elif msg.text == 'Max temp':
-        data = rsp['main']['temp_max']
-    elif msg.text == 'Min temp':
-        data = rsp['main']['temp_min']
-    else:
-        data = rsp['weather'][0]['main']
-    
-    await msg.answer(str(data), reply_markup=ReplyKeyboardRemove())
-
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=False)
+    executor.start_polling(dp, skip_updates=False, allowed_updates=['message', 'callback_query'])
