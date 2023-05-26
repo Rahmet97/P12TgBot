@@ -1,15 +1,6 @@
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-
-from database.handler import get_user
-from states.states import UserState
-from dispetcher import dp
-
-import os
-
-import requests
 import logging
-from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, executor
+
+from aiogram import executor
 from aiogram.dispatcher import FSMContext
 from aiogram.types import (
     Message,
@@ -20,9 +11,13 @@ from aiogram.types import (
     ReplyKeyboardRemove
 )
 
+from database.handler import get_user
+from dispetcher import dp
+from states.states import UserState
+from callbacks import callback_handler
+
 logging.basicConfig(level=logging.INFO)
 
-from callbacks.callback_handler import confirm, cancel
 
 @dp.message_handler(commands=['start'])
 async def start(msg: Message):
@@ -87,6 +82,19 @@ async def set_age(msg: Message, state: FSMContext):
 @dp.message_handler(commands=['help'])
 async def help(msg: Message):
     await msg.reply('Bu bot shunchaki test uchun.')
+
+
+@dp.message_handler(lambda x: 'http' in x.text.lower() or x.entities[0].url)
+async def remove_ads(msg: Message):
+    await msg.delete()
+    await msg.answer(f'@{msg.from_user.username} reklama tarqatish mumkin emas!')
+
+
+@dp.message_handler(lambda x: 'http' in x.caption.lower() or x.caption_entities[0].url, content_types=['photo'])
+async def remove_ads(msg: Message):
+    print(msg.caption)
+    await msg.delete()
+    await msg.answer(f'@{msg.from_user.username} reklama tarqatish mumkin emas!')
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=False, allowed_updates=['message', 'callback_query'])

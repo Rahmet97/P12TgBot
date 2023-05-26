@@ -16,7 +16,6 @@ async def confirm(callback: CallbackQuery, state: FSMContext):
     await state.reset_data()
     await add_user(full_name=fullname, phone=phone, age=int(age))
     await callback.message.answer("Ma'lumotlar saqlandi.")
-    await callback.message.delete()
 
 
 @dp.callback_query_handler(text="cancel", state=UserState.age)
